@@ -26,7 +26,7 @@ function main() {
     process.exit(1);
   }
 
-  if (process.argv[4] === `\d`) {
+  if (process.argv[4] === "\\d") {
     if (checkDigit()) {
       process.exit(1);
     } else {
