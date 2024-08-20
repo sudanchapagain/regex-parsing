@@ -18,6 +18,10 @@ function isDigitCharacter(ascii) {
 }
 
 function matchPattern(inputLine, pattern) {
+  if (pattern.startsWith("^")) {
+    return matchComplexPattern(inputLine, pattern.slice(1), true);
+  }
+
   if (pattern === "\\d") {
     for (let i = 0; i < inputLine.length; i++) {
       if (isDigitCharacter(inputLine.charCodeAt(i))) {
@@ -55,7 +59,30 @@ function matchPattern(inputLine, pattern) {
   }
 }
 
-function matchComplexPattern(inputLine, pattern) {
+function matchComplexPattern(inputLine, pattern, matchFromStart = false) {
+  if (matchFromStart && pattern.length > 0) {
+    for (let i = 0; i < pattern.length; i++) {
+      if (pattern[i] === "\\") {
+        if (
+          pattern[i + 1] === "d" &&
+          isDigitCharacter(inputLine.charCodeAt(i))
+        ) {
+          i++;
+        } else if (
+          pattern[i + 1] === "w" &&
+          isWordCharacter(inputLine.charCodeAt(i))
+        ) {
+          i++;
+        } else {
+          return false;
+        }
+      } else if (inputLine[i] !== pattern[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   let compare = [];
   for (let i = 0; i < pattern.length; i++) {
     if (pattern[i] === "\\") {
