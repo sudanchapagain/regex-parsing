@@ -25,35 +25,19 @@ function matchPattern(inputLine, pattern) {
   }
 
   if (pattern === "\\d") {
-    for (let i = 0; i < inputLine.length; i++) {
-      if (isDigitCharacter(inputLine.charCodeAt(i))) {
-        return true;
-      }
-    }
-    return false;
+    return inputLine
+      .split("")
+      .some((char) => isDigitCharacter(char.charCodeAt(0)));
   } else if (pattern === "\\w") {
-    for (let i = 0; i < inputLine.length; i++) {
-      if (isWordCharacter(inputLine.charCodeAt(i))) {
-        return true;
-      }
-    }
-    return false;
+    return inputLine
+      .split("")
+      .some((char) => isWordCharacter(char.charCodeAt(0)));
   } else if (pattern.startsWith("[^") && pattern.endsWith("]")) {
     const excludedChars = new Set(pattern.slice(2, -1));
-    for (let i = 0; i < inputLine.length; i++) {
-      if (!excludedChars.has(inputLine[i])) {
-        return true;
-      }
-    }
-    return false;
+    return inputLine.split("").every((char) => !excludedChars.has(char));
   } else if (pattern.startsWith("[") && pattern.endsWith("]")) {
     const includedChars = new Set(pattern.slice(1, -1));
-    for (let i = 0; i < inputLine.length; i++) {
-      if (includedChars.has(inputLine[i])) {
-        return true;
-      }
-    }
-    return false;
+    return inputLine.split("").some((char) => includedChars.has(char));
   } else if (pattern.length === 1) {
     return inputLine.includes(pattern);
   } else {
@@ -111,23 +95,40 @@ function matchAnywhereInLine(inputLine, pattern) {
         compare.push("\\w");
       }
       i++;
+    } else if (pattern[i] === "+") {
+      const prevChar = compare.pop();
+      compare.push(prevChar + "+");
     } else {
       compare.push(pattern[i]);
     }
   }
 
-  let compareCount = 0;
+  let compareIndex = 0;
   for (let i = 0; i < inputLine.length; i++) {
-    if (compareCount === compare.length) break;
+    if (compareIndex >= compare.length) break;
 
-    if (matchesPattern(inputLine[i], compare[compareCount])) {
-      compareCount++;
+    const currentCompare = compare[compareIndex];
+    const char = inputLine[i];
+
+    if (currentCompare.endsWith("+")) {
+      const basePattern = currentCompare.slice(0, -1);
+
+      if (matchesPattern(char, basePattern)) {
+        compareIndex++;
+        while (matchesPattern(inputLine[i + 1], basePattern)) {
+          i++;
+        }
+      } else {
+        return false;
+      }
+    } else if (matchesPattern(char, currentCompare)) {
+      compareIndex++;
     } else {
-      compareCount = 0;
+      compareIndex = 0;
     }
   }
 
-  return compareCount === compare.length;
+  return compareIndex === compare.length;
 }
 
 function main() {
