@@ -1,88 +1,94 @@
 function matchPattern(inputLine, pattern) {
   const inputLength = inputLine.length;
+  const patternLength = pattern.length;
 
-  if (pattern.startsWith("[^") && pattern.endsWith("]")) {
-    // negative character groups [^abc]
-    const testGroup = pattern.slice(2, -1);
+  let i = 0;
+  let j = 0;
 
-    // empty or unbalanced brackets
-    if (
-      testGroup.length === 0 ||
-      (pattern.includes("[") && !pattern.includes("]"))
-    ) {
-      throw new Error("Empty or improper brackets in pattern");
-    }
+  while (i < inputLength && j < patternLength) {
+    if (pattern[j] === "\\") {
+      j++; // character after '\'
 
-    // inputLine does not match the characters in the group
-    for (let i = 0; i < inputLength; i++) {
-      if (!testGroup.includes(inputLine[i])) {
-        return true;
+      if (pattern[j] === "d") {
+        // if pattern is d then check input is a digit
+        if (inputLine[i] >= "0" && inputLine[i] <= "9") {
+          i++;
+          j++;
+        } else {
+          return false;
+        }
+      } else if (pattern[j] === "w") {
+        // if pattern is w then check input is a A-Z, a-z, 0-9 or _
+        if (
+          (inputLine[i] >= "a" && inputLine[i] <= "z") ||
+          (inputLine[i] >= "A" && inputLine[i] <= "Z") ||
+          (inputLine[i] >= "0" && inputLine[i] <= "9") ||
+          inputLine[i] === "_"
+        ) {
+          i++;
+          j++;
+        } else {
+          return false;
+        }
+      } else {
+        throw new Error(`Unhandled escape sequence: \\${pattern[j]}`);
+      }
+    } else if (pattern[j] === "[") {
+      let negate = false;
+      j++; // after [
+      if (pattern[j] === "^") {
+        negate = true;
+        j++; // after ^
+      }
+
+      const charGroup = [];
+      while (pattern[j] !== "]") {
+        if (j >= patternLength) {
+          throw new Error(`Unmatched [ in pattern: ${pattern}`);
+        }
+        charGroup.push(pattern[j]);
+        j++;
+      }
+      j++; // after ]
+
+      if (negate) {
+        if (!charGroup.includes(inputLine[i])) {
+          i++;
+        } else {
+          return false;
+        }
+      } else {
+        if (charGroup.includes(inputLine[i])) {
+          i++;
+        } else {
+          return false;
+        }
+      }
+    } else {
+      if (inputLine[i] === pattern[j]) {
+        i++;
+        j++;
+      } else {
+        return false;
       }
     }
-    return false;
-  } else if (pattern.startsWith("[") && pattern.endsWith("]")) {
-    // positive character groups [abc]
-    const testGroup = pattern.slice(1, -1);
-
-    // empty or unbalanced brackets
-    if (
-      testGroup.length === 0 ||
-      (pattern.includes("[") && !pattern.includes("]"))
-    ) {
-      throw new Error("Empty or improper brackets in pattern");
-    }
-
-    // inputLine matches one of the characters in the group
-    for (let i = 0; i < inputLength; i++) {
-      if (testGroup.includes(inputLine[i])) {
-        return true;
-      }
-    }
-    return false;
-
-    // match digits
-  } else if (pattern === "\\d") {
-    for (let i = 0; i < inputLength; i++) {
-      const charCode = inputLine.charCodeAt(i);
-      // ASCII codes for '0' to '9'
-      if (charCode >= 48 && charCode <= 57) {
-        return true;
-      }
-    }
-
-    // match alphanumeric character or underscore
-  } else if (pattern === "\\w") {
-    for (let i = 0; i < inputLength; i++) {
-      const charCode = inputLine.charCodeAt(i);
-      if (
-        // 0 to 9
-        (charCode >= 48 && charCode <= 57) ||
-        // A to Z
-        (charCode >= 65 && charCode <= 90) ||
-        // a to z
-        (charCode >= 97 && charCode <= 122) ||
-        // underscore
-        charCode === 95
-      ) {
-        return true;
-      }
-    }
-  } else if (pattern.length === 1) {
-    return inputLine.includes(pattern);
-  } else {
-    throw new Error(`Unhandled pattern ${pattern}`);
   }
 
-  return false;
+  return j === patternLength;
 }
 
 function main() {
-  const pattern = process.argv[3];
-  const inputLine = require("fs").readFileSync(0, "utf-8").trim();
+  try {
+    const pattern = process.argv[3];
+    const inputLine = require("fs").readFileSync(0, "utf-8").trim();
 
-  if (matchPattern(inputLine, pattern)) {
-    process.exit(0);
-  } else {
+    if (matchPattern(inputLine, pattern)) {
+      process.exit(0);
+    } else {
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 }
