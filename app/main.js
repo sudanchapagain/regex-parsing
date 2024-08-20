@@ -1,94 +1,113 @@
+const fs = require("fs");
+const args = process.argv;
+
+const pattern = args[3];
+const inputLine = fs.readFileSync(0, "utf-8").trim();
+
+function isWordCharacter(ascii) {
+  return (
+    (ascii >= 48 && ascii <= 57) || // 0-9
+    (ascii >= 65 && ascii <= 90) || // A-Z
+    (ascii >= 97 && ascii <= 122) || // a-z
+    ascii === 95 // _
+  );
+}
+
+function isDigitCharacter(ascii) {
+  return ascii >= 48 && ascii <= 57; // 0-9
+}
+
 function matchPattern(inputLine, pattern) {
-  const inputLength = inputLine.length;
-  const patternLength = pattern.length;
-
-  let i = 0;
-  let j = 0;
-
-  while (i < inputLength && j < patternLength) {
-    if (pattern[j] === "\\") {
-      j++; // character after '\'
-
-      if (pattern[j] === "d") {
-        // if pattern is d then check input is a digit
-        if (inputLine[i] >= "0" && inputLine[i] <= "9") {
-          i++;
-          j++;
-        } else {
-          return false;
-        }
-      } else if (pattern[j] === "w") {
-        // if pattern is w then check input is a A-Z, a-z, 0-9 or _
-        if (
-          (inputLine[i] >= "a" && inputLine[i] <= "z") ||
-          (inputLine[i] >= "A" && inputLine[i] <= "Z") ||
-          (inputLine[i] >= "0" && inputLine[i] <= "9") ||
-          inputLine[i] === "_"
-        ) {
-          i++;
-          j++;
-        } else {
-          return false;
-        }
-      } else {
-        throw new Error(`Unhandled escape sequence: \\${pattern[j]}`);
+  if (pattern === "\\d") {
+    for (let i = 0; i < inputLine.length; i++) {
+      if (isDigitCharacter(inputLine.charCodeAt(i))) {
+        return true;
       }
-    } else if (pattern[j] === "[") {
-      let negate = false;
-      j++; // after [
-      if (pattern[j] === "^") {
-        negate = true;
-        j++; // after ^
+    }
+    return false;
+  } else if (pattern === "\\w") {
+    for (let i = 0; i < inputLine.length; i++) {
+      if (isWordCharacter(inputLine.charCodeAt(i))) {
+        return true;
       }
+    }
+    return false;
+  } else if (pattern.startsWith("[^") && pattern.endsWith("]")) {
+    const excludedChars = new Set(pattern.slice(2, -1));
+    for (let i = 0; i < inputLine.length; i++) {
+      if (!excludedChars.has(inputLine[i])) {
+        return true;
+      }
+    }
+    return false;
+  } else if (pattern.startsWith("[") && pattern.endsWith("]")) {
+    const includedChars = new Set(pattern.slice(1, -1));
+    for (let i = 0; i < inputLine.length; i++) {
+      if (includedChars.has(inputLine[i])) {
+        return true;
+      }
+    }
+    return false;
+  } else if (pattern.length === 1) {
+    return inputLine.includes(pattern);
+  } else {
+    return matchComplexPattern(inputLine, pattern);
+  }
+}
 
-      const charGroup = [];
-      while (pattern[j] !== "]") {
-        if (j >= patternLength) {
-          throw new Error(`Unmatched [ in pattern: ${pattern}`);
-        }
-        charGroup.push(pattern[j]);
-        j++;
+function matchComplexPattern(inputLine, pattern) {
+  let compare = [];
+  for (let i = 0; i < pattern.length; i++) {
+    if (pattern[i] === "\\") {
+      if (pattern[i + 1] === "d") {
+        compare.push("\\d");
+      } else if (pattern[i + 1] === "w") {
+        compare.push("\\w");
       }
-      j++; // after ]
-
-      if (negate) {
-        if (!charGroup.includes(inputLine[i])) {
-          i++;
-        } else {
-          return false;
-        }
-      } else {
-        if (charGroup.includes(inputLine[i])) {
-          i++;
-        } else {
-          return false;
-        }
-      }
+      i++;
     } else {
-      if (inputLine[i] === pattern[j]) {
-        i++;
-        j++;
-      } else {
-        return false;
-      }
+      compare.push(pattern[i]);
     }
   }
 
-  return j === patternLength;
+  let compareCount = 0;
+  for (let i = 0; i < inputLine.length; i++) {
+    if (compareCount === compare.length) break;
+
+    const charAscii = inputLine.charCodeAt(i);
+    const currentCompare = compare[compareCount];
+
+    if (currentCompare === "\\w") {
+      if (isWordCharacter(charAscii)) {
+        compareCount++;
+      } else {
+        compareCount = 0;
+      }
+    } else if (currentCompare === "\\d") {
+      if (isDigitCharacter(charAscii)) {
+        compareCount++;
+      } else {
+        compareCount = 0;
+      }
+    } else if (inputLine[i] === currentCompare) {
+      compareCount++;
+    } else {
+      compareCount = 0;
+    }
+  }
+
+  return compareCount === compare.length;
 }
 
 function main() {
-  try {
-    const pattern = process.argv[3];
-    const inputLine = require("fs").readFileSync(0, "utf-8").trim();
+  if (args[2] !== "-E") {
+    console.error("Expected first argument to be '-E'");
+    process.exit(1);
+  }
 
-    if (matchPattern(inputLine, pattern)) {
-      process.exit(0);
-    } else {
-      process.exit(1);
-    }
-  } catch (err) {
-    console.error(err.message);
+  if (matchPattern(inputLine, pattern)) {
+    process.exit(0);
+  } else {
     process.exit(1);
   }
 }
