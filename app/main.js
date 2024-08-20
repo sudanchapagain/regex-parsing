@@ -1,8 +1,28 @@
 function matchPattern(inputLine, pattern) {
   const inputLength = inputLine.length;
 
-  // match digits
-  if (pattern === "\\d") {
+  if (pattern.startsWith("[") && pattern.endsWith("]")) {
+    // positive character groups [abc]
+    const testGroup = pattern.slice(1, -1);
+
+    // empty or unbalanced brackets
+    if (
+      testGroup.length === 0 ||
+      (pattern.includes("[") && !pattern.includes("]"))
+    ) {
+      throw new Error("Empty or improper brackets in pattern");
+    }
+
+    // inputLine matches one of the characters in the group
+    for (let i = 0; i < inputLength; i++) {
+      if (testGroup.includes(inputLine[i])) {
+        return true;
+      }
+    }
+    return false;
+
+    // match digits
+  } else if (pattern === "\\d") {
     for (let i = 0; i < inputLength; i++) {
       const charCode = inputLine.charCodeAt(i);
       // ASCII codes for '0' to '9'
