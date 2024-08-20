@@ -20,6 +20,8 @@ function isDigitCharacter(ascii) {
 function matchPattern(inputLine, pattern) {
   if (pattern.startsWith("^")) {
     return matchComplexPattern(inputLine, pattern.slice(1), true);
+  } else if (pattern.endsWith("$")) {
+    return matchComplexPattern(inputLine, pattern.slice(0, -1), false, true);
   }
 
   if (pattern === "\\d") {
@@ -59,30 +61,47 @@ function matchPattern(inputLine, pattern) {
   }
 }
 
-function matchComplexPattern(inputLine, pattern, matchFromStart = false) {
-  if (matchFromStart && pattern.length > 0) {
+function matchComplexPattern(
+  inputLine,
+  pattern,
+  matchFromStart = false,
+  matchToEnd = false
+) {
+  if (matchFromStart) {
+    if (inputLine.length < pattern.length) return false;
     for (let i = 0; i < pattern.length; i++) {
-      if (pattern[i] === "\\") {
-        if (
-          pattern[i + 1] === "d" &&
-          isDigitCharacter(inputLine.charCodeAt(i))
-        ) {
-          i++;
-        } else if (
-          pattern[i + 1] === "w" &&
-          isWordCharacter(inputLine.charCodeAt(i))
-        ) {
-          i++;
-        } else {
-          return false;
-        }
-      } else if (inputLine[i] !== pattern[i]) {
+      if (!matchesPattern(inputLine[i], pattern[i])) {
         return false;
       }
     }
     return true;
   }
 
+  if (matchToEnd) {
+    if (inputLine.length < pattern.length) return false;
+    let inputStart = inputLine.length - pattern.length;
+    for (let i = 0; i < pattern.length; i++) {
+      if (!matchesPattern(inputLine[inputStart + i], pattern[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  return matchAnywhereInLine(inputLine, pattern);
+}
+
+function matchesPattern(char, patternChar) {
+  if (patternChar === "\\d") {
+    return isDigitCharacter(char.charCodeAt(0));
+  }
+  if (patternChar === "\\w") {
+    return isWordCharacter(char.charCodeAt(0));
+  }
+  return char === patternChar;
+}
+
+function matchAnywhereInLine(inputLine, pattern) {
   let compare = [];
   for (let i = 0; i < pattern.length; i++) {
     if (pattern[i] === "\\") {
@@ -101,22 +120,7 @@ function matchComplexPattern(inputLine, pattern, matchFromStart = false) {
   for (let i = 0; i < inputLine.length; i++) {
     if (compareCount === compare.length) break;
 
-    const charAscii = inputLine.charCodeAt(i);
-    const currentCompare = compare[compareCount];
-
-    if (currentCompare === "\\w") {
-      if (isWordCharacter(charAscii)) {
-        compareCount++;
-      } else {
-        compareCount = 0;
-      }
-    } else if (currentCompare === "\\d") {
-      if (isDigitCharacter(charAscii)) {
-        compareCount++;
-      } else {
-        compareCount = 0;
-      }
-    } else if (inputLine[i] === currentCompare) {
+    if (matchesPattern(inputLine[i], compare[compareCount])) {
       compareCount++;
     } else {
       compareCount = 0;
