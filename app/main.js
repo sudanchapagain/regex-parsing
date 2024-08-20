@@ -1,7 +1,26 @@
 function matchPattern(inputLine, pattern) {
   const inputLength = inputLine.length;
 
-  if (pattern.startsWith("[") && pattern.endsWith("]")) {
+  if (pattern.startsWith("[^") && pattern.endsWith("]")) {
+    // negative character groups [^abc]
+    const testGroup = pattern.slice(2, -1);
+
+    // empty or unbalanced brackets
+    if (
+      testGroup.length === 0 ||
+      (pattern.includes("[") && !pattern.includes("]"))
+    ) {
+      throw new Error("Empty or improper brackets in pattern");
+    }
+
+    // inputLine does not match the characters in the group
+    for (let i = 0; i < inputLength; i++) {
+      if (!testGroup.includes(inputLine[i])) {
+        return true;
+      }
+    }
+    return false;
+  } else if (pattern.startsWith("[") && pattern.endsWith("]")) {
     // positive character groups [abc]
     const testGroup = pattern.slice(1, -1);
 
