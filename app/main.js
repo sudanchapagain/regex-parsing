@@ -1,147 +1,191 @@
-const fs = require("fs");
 const args = process.argv;
 
-const pattern = args[3];
-const inputLine = fs.readFileSync(0, "utf-8").trim();
+const regexPattern = args[3];
 
-function isWordCharacter(ascii) {
+function isDigit(character) {
+  return character >= "0" && character <= "9";
+}
+
+function isWordChar(character) {
   return (
-    (ascii >= 48 && ascii <= 57) || // 0-9
-    (ascii >= 65 && ascii <= 90) || // A-Z
-    (ascii >= 97 && ascii <= 122) || // a-z
-    ascii === 95 // _
+    (character >= "A" && character <= "z") ||
+    character === "_" ||
+    (character >= "0" && character <= "9")
   );
 }
 
-function isDigitCharacter(ascii) {
-  return ascii >= 48 && ascii <= 57; // 0-9
-}
+function parseRegexPattern(pattern) {
+  const chars = pattern.split("");
 
-function matchPattern(inputLine, pattern) {
-  if (pattern.startsWith("^")) {
-    return matchComplexPattern(inputLine, pattern.slice(1), true);
-  } else if (pattern.endsWith("$")) {
-    return matchComplexPattern(inputLine, pattern.slice(0, -1), false, true);
-  }
+  let startAnchor = false;
+  let endAnchor = false;
 
-  if (pattern === "\\d") {
-    return inputLine
-      .split("")
-      .some((char) => isDigitCharacter(char.charCodeAt(0)));
-  } else if (pattern === "\\w") {
-    return inputLine
-      .split("")
-      .some((char) => isWordCharacter(char.charCodeAt(0)));
-  } else if (pattern.startsWith("[^") && pattern.endsWith("]")) {
-    const excludedChars = new Set(pattern.slice(2, -1));
-    return inputLine.split("").every((char) => !excludedChars.has(char));
-  } else if (pattern.startsWith("[") && pattern.endsWith("]")) {
-    const includedChars = new Set(pattern.slice(1, -1));
-    return inputLine.split("").some((char) => includedChars.has(char));
-  } else if (pattern.length === 1) {
-    return inputLine.includes(pattern);
-  } else {
-    return matchComplexPattern(inputLine, pattern);
-  }
-}
+  const tokenFunctions = [];
 
-function matchComplexPattern(
-  inputLine,
-  pattern,
-  matchFromStart = false,
-  matchToEnd = false
-) {
-  if (matchFromStart) {
-    if (inputLine.length < pattern.length) return false;
-    for (let i = 0; i < pattern.length; i++) {
-      if (!matchesPattern(inputLine[i], pattern[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
+  while (chars.length > 0) {
+    const currentChar = chars.shift();
+    const nextChar = chars[0];
 
-  if (matchToEnd) {
-    if (inputLine.length < pattern.length) return false;
-    let inputStart = inputLine.length - pattern.length;
-    for (let i = 0; i < pattern.length; i++) {
-      if (!matchesPattern(inputLine[inputStart + i], pattern[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  return matchAnywhereInLine(inputLine, pattern);
-}
-
-function matchesPattern(char, patternChar) {
-  if (patternChar === "\\d") {
-    return isDigitCharacter(char.charCodeAt(0));
-  }
-  if (patternChar === "\\w") {
-    return isWordCharacter(char.charCodeAt(0));
-  }
-  return char === patternChar;
-}
-
-function matchAnywhereInLine(inputLine, pattern) {
-  let compare = [];
-  for (let i = 0; i < pattern.length; i++) {
-    if (pattern[i] === "\\") {
-      if (pattern[i + 1] === "d") {
-        compare.push("\\d");
-      } else if (pattern[i + 1] === "w") {
-        compare.push("\\w");
-      }
-      i++;
-    } else if (pattern[i] === "+") {
-      const prevChar = compare.pop();
-      compare.push(prevChar + "+");
-    } else {
-      compare.push(pattern[i]);
-    }
-  }
-
-  let compareIndex = 0;
-  for (let i = 0; i < inputLine.length; i++) {
-    if (compareIndex >= compare.length) break;
-
-    const currentCompare = compare[compareIndex];
-    const char = inputLine[i];
-
-    if (currentCompare.endsWith("+")) {
-      const basePattern = currentCompare.slice(0, -1);
-
-      if (matchesPattern(char, basePattern)) {
-        compareIndex++;
-        while (matchesPattern(inputLine[i + 1], basePattern)) {
-          i++;
+    if (currentChar === "^") {
+      startAnchor = true;
+    } else if (currentChar === "$") {
+      endAnchor = true;
+    } else if (currentChar === "+") {
+      const previousFunction = tokenFunctions[tokenFunctions.length - 1];
+      tokenFunctions[tokenFunctions.length - 1] = (char, remainingChars) => {
+        if (!previousFunction(char, []).valid) {
+          return { valid: false };
         }
-      } else {
-        return false;
+        char = remainingChars[0];
+        while (previousFunction(char, []).valid) {
+          remainingChars.splice(0, 1);
+          char = remainingChars[0];
+        }
+        return { valid: true };
+      };
+    } else if (currentChar === "?") {
+      const previousFunction = tokenFunctions[tokenFunctions.length - 1];
+      tokenFunctions[tokenFunctions.length - 1] = (char, remainingChars) => {
+        const previousResult = previousFunction(char, []);
+        if (previousResult.valid) {
+          return previousResult;
+        }
+        return { valid: true, returnChar: true };
+      };
+    } else if (currentChar === "\\") {
+      if (["d", "w"].includes(nextChar)) {
+        chars.shift();
+        if (nextChar === "d") {
+          tokenFunctions.push((char) => ({ valid: [char].some(isDigit) }));
+        } else if (nextChar === "w") {
+          tokenFunctions.push((char) => ({ valid: [char].some(isWordChar) }));
+        }
       }
-    } else if (matchesPattern(char, currentCompare)) {
-      compareIndex++;
+    } else if (currentChar === "[") {
+      const isInverted = nextChar !== "^";
+      if (isInverted) {
+        chars.shift();
+      }
+      const offset = pattern.length - chars.length;
+      const endBracketIndex = pattern.substring(offset).indexOf("]");
+      const charSet = pattern.substring(offset, offset + endBracketIndex);
+      chars.splice(0, charSet.length + 1);
+      const validChars = new Set(charSet.split(""));
+      tokenFunctions.push((char, remainingChars) => {
+        const containsValidChar = [char, ...remainingChars].some((c) =>
+          validChars.has(c)
+        );
+        if (isInverted ? containsValidChar : !containsValidChar) {
+          remainingChars.splice(0, remainingChars.length);
+          return { valid: true };
+        }
+        return { valid: false };
+      });
     } else {
-      compareIndex = 0;
+      tokenFunctions.push((char) => {
+        const matches = char === currentChar;
+        return { valid: matches };
+      });
     }
   }
 
-  return compareIndex === compare.length;
+  return { startAnchor, endAnchor, tokenFunctions };
 }
 
-function main() {
+function doesPatternMatch(input, pattern) {
+  if (pattern.length === 1) {
+    return input.includes(pattern);
+  } else if (pattern === "\\d") {
+    return [...input].some(isDigit);
+  } else if (pattern === "\\w") {
+    return [...input].some(isWordChar);
+  } else if (pattern[0] === "[" && pattern[pattern.length - 1] === "]") {
+    const isInverted = pattern[1] !== "^";
+    const substringOffset = isInverted ? 1 : 2;
+    const validChars = new Set(
+      pattern.substring(substringOffset, pattern.length - 1).split("")
+    );
+    const containsValidChar = [...input].some((char) => validChars.has(char));
+    return isInverted ? containsValidChar : !containsValidChar;
+  }
+
+  const { startAnchor, endAnchor, tokenFunctions } = parseRegexPattern(pattern);
+
+  console.log(
+    `doesPatternMatch tokenFunctions-${tokenFunctions.length}`,
+    JSON.stringify(
+      { tokenFunctions: tokenFunctions.map((fn) => fn.toString()) },
+      null,
+      2
+    )
+  );
+
+  let remainingChars = input.split("");
+  let isValid = true;
+  let hasStarted = !startAnchor;
+
+  if (startAnchor && !input.startsWith(pattern.replace(/[\^$]/g, ""))) {
+    return false;
+  }
+
+  while (remainingChars.length) {
+    const currentChar = remainingChars.shift();
+
+    if (!hasStarted) {
+      if (tokenFunctions[0](currentChar, remainingChars).valid) {
+        hasStarted = true;
+        tokenFunctions.shift();
+      }
+    } else {
+      if (tokenFunctions[0]?.(currentChar, remainingChars).valid) {
+        const functionResult = tokenFunctions[0]?.(currentChar, remainingChars);
+        if (functionResult?.valid) {
+          tokenFunctions.shift();
+          if (functionResult.returnChar) {
+            remainingChars.unshift(currentChar);
+          }
+          if (!tokenFunctions.length) {
+            if (
+              endAnchor &&
+              input.length - remainingChars.length < input.length
+            ) {
+              isValid = false;
+            }
+            break;
+          }
+        } else {
+          isValid = false;
+          break;
+        }
+      }
+    }
+  }
+
+  if (tokenFunctions.length) {
+    return false;
+  }
+
+  return isValid;
+}
+
+async function execute() {
   if (args[2] !== "-E") {
-    console.error("Expected first argument to be '-E'");
+    console.log("Expected first argument to be '-E'");
     process.exit(1);
   }
 
-  if (matchPattern(inputLine, pattern)) {
+  let inputString = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) {
+    inputString += chunk;
+  }
+  inputString = inputString.trim();
+
+  if (doesPatternMatch(inputString, regexPattern)) {
     process.exit(0);
   } else {
     process.exit(1);
   }
 }
 
-main();
+execute();
