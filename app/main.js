@@ -81,6 +81,8 @@ function parseRegexPattern(pattern) {
         }
         return { valid: false };
       });
+    } else if (currentChar === ".") {
+      tokenFunctions.push((char) => ({ valid: true }));
     } else {
       tokenFunctions.push((char) => {
         const matches = char === currentChar;
