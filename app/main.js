@@ -1,11 +1,11 @@
-const args = process.argv;
-const regexPattern = args[3];
+const commandLineArgs = process.argv;
+const regexPattern = commandLineArgs[3];
 
-function isDigit(character) {
+function isNumberCharacter(character) {
   return character >= "0" && character <= "9";
 }
 
-function isWordChar(character) {
+function isValidCharacter(character) {
   return (
     (character >= "A" && character <= "z") ||
     character === "_" ||
@@ -14,205 +14,290 @@ function isWordChar(character) {
 }
 
 function parseRegexPattern(pattern) {
-  const characters = pattern.split("");
+  const patternCharacters = pattern.split("");
+
   let hasStartAnchor = false;
   let hasEndAnchor = false;
-  const tokenParsers = [];
 
-  while (characters.length > 0) {
-    const currentCharacter = characters.shift();
-    const nextCharacter = characters[0];
+  const matchedGroups = [];
+  const parsedTokens = [];
+
+  while (patternCharacters.length > 0) {
+    const currentCharacter = patternCharacters.shift();
+    const nextCharacter = patternCharacters[0];
 
     if (currentCharacter === "^") {
       hasStartAnchor = true;
     } else if (currentCharacter === "$") {
       hasEndAnchor = true;
     } else if (currentCharacter === "+") {
-      const previousParser = tokenParsers[tokenParsers.length - 1];
-      tokenParsers[tokenParsers.length - 1] = (char, remainingChars) => {
-        if (!previousParser(char, []).valid) {
+      const previousToken = parsedTokens[parsedTokens.length - 1];
+      parsedTokens[parsedTokens.length - 1] = (
+        character,
+        remainingCharacters
+      ) => {
+        if (!previousToken(character, []).valid) {
           return { valid: false };
         }
-        char = remainingChars[0];
-        while (previousParser(char, []).valid) {
-          remainingChars.splice(0, 1);
-          char = remainingChars[0];
+        character = remainingCharacters[0];
+        while (character && previousToken(character, []).valid) {
+          remainingCharacters.splice(0, 1);
+          character = remainingCharacters[0];
         }
         return { valid: true };
       };
     } else if (currentCharacter === "?") {
-      const previousParser = tokenParsers[tokenParsers.length - 1];
-      tokenParsers[tokenParsers.length - 1] = (char, remainingChars) => {
-        const previousResult = previousParser(char, []);
+      const previousToken = parsedTokens[parsedTokens.length - 1];
+      parsedTokens[parsedTokens.length - 1] = (
+        character,
+        remainingCharacters
+      ) => {
+        const previousResult = previousToken(character, []);
         if (previousResult.valid) {
           return previousResult;
         }
-        return { valid: true, returnChar: true };
+        return { valid: true, returnCharacter: true };
       };
     } else if (currentCharacter === ".") {
-      tokenParsers.push((char, remainingChars) => {
-        return { valid: true };
-      });
+      parsedTokens.push((character, remainingCharacters) => ({ valid: true }));
     } else if (currentCharacter === "\\") {
       if (["d", "w"].includes(nextCharacter)) {
-        characters.shift();
+        patternCharacters.shift();
         if (nextCharacter === "d") {
-          tokenParsers.push((char, remainingChars) => ({
-            valid: [char].some(isDigit),
+          parsedTokens.push((character, remainingCharacters) => ({
+            valid: [character].some(isNumberCharacter),
           }));
         } else if (nextCharacter === "w") {
-          tokenParsers.push((char, remainingChars) => ({
-            valid: [char].some(isWordChar),
+          parsedTokens.push((character, remainingCharacters) => ({
+            valid: [character].some(isValidCharacter),
           }));
         }
+      } else if (isNumberCharacter(nextCharacter)) {
+        patternCharacters.shift();
+        parsedTokens.push((character, remainingCharacters) => {
+          const matchedGroup = matchedGroups[+nextCharacter - 1];
+          const inputSubstring = [character, ...remainingCharacters].join("");
+          if (matchedGroup && inputSubstring.startsWith(matchedGroup)) {
+            remainingCharacters.splice(0, matchedGroup.length - 1);
+            return { valid: true };
+          } else {
+            return { valid: false };
+          }
+        });
       }
     } else if (currentCharacter === "[") {
-      const isInverted = nextCharacter !== "^";
-      if (!isInverted) {
-        characters.shift();
+      const isInvertedSet = nextCharacter !== "^";
+      if (!isInvertedSet) {
+        patternCharacters.shift();
       }
-      const offset = pattern.length - characters.length;
-      const closingBracketIndex = pattern.substring(offset).indexOf("]");
+      const substringOffset = pattern.length - patternCharacters.length;
+      const closingBracketIndex = pattern
+        .substring(substringOffset)
+        .indexOf("]");
       if (closingBracketIndex === -1) {
-        console.log("Invalid pattern, missing ']'");
+        console.error("Missing closing bracket");
         process.exit(2);
-        return;
+        throw new Error("Missing closing bracket");
       }
       const characterSet = pattern.substring(
-        offset,
-        offset + closingBracketIndex
+        substringOffset,
+        substringOffset + closingBracketIndex
       );
-      characters.splice(0, characterSet.length + 1);
+      patternCharacters.splice(0, characterSet.length + 1);
       const validCharacters = new Set(characterSet.split(""));
-      tokenParsers.push((char, remainingChars) => {
-        const containsValidCharacter = [char, ...remainingChars].some((c) =>
-          validCharacters.has(c)
+      parsedTokens.push((character, remainingCharacters) => {
+        const hasValidCharacter = [character, ...remainingCharacters].some(
+          (char) => validCharacters.has(char)
         );
-        if (isInverted ? containsValidCharacter : !containsValidCharacter) {
-          remainingChars.splice(0, remainingChars.length);
+        if (isInvertedSet ? hasValidCharacter : !hasValidCharacter) {
+          remainingCharacters.splice(0, remainingCharacters.length);
           return { valid: true };
         }
         return { valid: false };
       });
     } else if (currentCharacter === "(") {
-      const offset = pattern.length - characters.length;
-      const closingParenthesisIndex = pattern.substring(offset).indexOf(")");
+      const substringOffset = pattern.length - patternCharacters.length;
+      const closingParenthesisIndex = pattern
+        .substring(substringOffset)
+        .indexOf(")");
       if (closingParenthesisIndex === -1) {
-        console.log("Invalid pattern, missing ')'");
+        console.error("Missing closing parenthesis");
         process.exit(2);
-        return;
+        throw new Error("Missing closing parenthesis");
       }
       const groupPattern = pattern.substring(
-        offset,
-        offset + closingParenthesisIndex
+        substringOffset,
+        substringOffset + closingParenthesisIndex
       );
-      characters.splice(0, groupPattern.length + 1);
+      patternCharacters.splice(0, groupPattern.length + 1);
       if (groupPattern.includes("|")) {
         const alternatives = groupPattern.split("|");
-        tokenParsers.push((char, remainingChars) => {
-          const inputString = [char, ...remainingChars].join("");
-          const matchingAlternative = alternatives.find((alt) =>
-            inputString.startsWith(alt)
-          );
-          if (matchingAlternative) {
-            remainingChars.splice(0, matchingAlternative.length - 1);
-            return { valid: true };
+        parsedTokens.push((character, remainingCharacters) => {
+          const inputSubstring = [character, ...remainingCharacters].join("");
+          let matchedAlternative;
+          for (const alternative of alternatives) {
+            const subPatternMatch = matchRegexPattern(
+              inputSubstring,
+              alternative
+            );
+            if (
+              typeof subPatternMatch !== "boolean" &&
+              subPatternMatch.result &&
+              subPatternMatch.matchedGroup
+            ) {
+              matchedAlternative = subPatternMatch.matchedGroup;
+              break;
+            }
           }
-          return { valid: false };
+          if (!matchedAlternative) {
+            return { valid: false };
+          }
+          if (!inputSubstring.startsWith(matchedAlternative)) {
+            return { valid: false };
+          }
+          matchedGroups.push(matchedAlternative);
+          remainingCharacters.splice(0, matchedAlternative.length - 1);
+          return { valid: true };
         });
       } else {
-        console.log("Unsupported pattern");
-        process.exit(2);
-        return;
+        parsedTokens.push((character, remainingCharacters) => {
+          const inputSubstring = [character, ...remainingCharacters].join("");
+          const subPatternMatch = matchRegexPattern(
+            inputSubstring,
+            groupPattern
+          );
+          if (
+            typeof subPatternMatch === "boolean" ||
+            !subPatternMatch.result ||
+            !subPatternMatch.matchedGroup
+          ) {
+            return { valid: false };
+          }
+          if (!inputSubstring.startsWith(subPatternMatch.matchedGroup)) {
+            return { valid: false };
+          }
+          matchedGroups.push(subPatternMatch.matchedGroup);
+          remainingCharacters.splice(
+            0,
+            subPatternMatch.matchedGroup.length - 1
+          );
+          return { valid: true };
+        });
       }
     } else {
-      tokenParsers.push(([char, remainingChars]) => {
-        const isValid = char === currentCharacter;
-        return { valid: isValid };
-      });
+      parsedTokens.push((character, remainingCharacters) => ({
+        valid: character === currentCharacter,
+      }));
     }
   }
 
-  return { hasStartAnchor, hasEndAnchor, tokenParsers };
+  return { hasStartAnchor, hasEndAnchor, parsedTokens };
 }
 
-function doesPatternMatch(input, pattern) {
+function matchRegexPattern(inputString, pattern) {
   if (pattern.length === 1) {
-    return input.includes(pattern);
+    return inputString.includes(pattern);
   } else if (pattern === "\\d") {
-    return [...input].some(isDigit);
+    return [...inputString].some(isNumberCharacter);
   } else if (pattern === "\\w") {
-    return [...input].some(isWordChar);
+    return [...inputString].some(isValidCharacter);
   } else if (pattern[0] === "[" && pattern[pattern.length - 1] === "]") {
-    const isInverted = pattern[1] !== "^";
-    const substringOffset = isInverted ? 1 : 2;
+    const isInvertedSet = pattern[1] !== "^";
+    const substringOffset = isInvertedSet ? 1 : 2;
     const validCharacters = new Set(
       pattern.substring(substringOffset, pattern.length - 1).split("")
     );
-    const containsValidCharacter = [...input].some((char) =>
-      validCharacters.has(char)
+    const hasValidCharacter = [...inputString].some((character) =>
+      validCharacters.has(character)
     );
-    return isInverted ? containsValidCharacter : !containsValidCharacter;
+    return isInvertedSet ? hasValidCharacter : !hasValidCharacter;
   }
 
-  const { hasStartAnchor, hasEndAnchor, tokenParsers } =
+  const { hasStartAnchor, hasEndAnchor, parsedTokens } =
     parseRegexPattern(pattern);
 
-  let remainingChars = input.split("");
-  let isValid = hasStartAnchor;
-  let hasStarted = hasStartAnchor;
+  let matchStartIndex = 0;
+  let remainingCharacters = inputString.split("");
+  let isMatchValid = hasStartAnchor;
+  let hasMatchStarted = hasStartAnchor;
 
-  while (remainingChars.length) {
-    const currentCharacter = remainingChars.shift();
-    if (!hasStarted) {
-      if (tokenParsers[0](currentCharacter, remainingChars).valid) {
-        hasStarted = true;
-        isValid = true;
-        tokenParsers.shift();
-      }
-    } else {
-      const parseResult = tokenParsers[0]?.(currentCharacter, remainingChars);
-      if (parseResult?.valid) {
-        tokenParsers.shift();
-        if (parseResult.returnChar) {
-          remainingChars.unshift(currentCharacter);
-        }
-        if (!tokenParsers.length) {
+  while (remainingCharacters.length) {
+    const currentCharacter = remainingCharacters.shift();
+
+    if (!hasMatchStarted) {
+      if (parsedTokens[0](currentCharacter, remainingCharacters).valid) {
+        hasMatchStarted = true;
+        isMatchValid = true;
+        parsedTokens.splice(0, 1);
+        if (!parsedTokens.length) {
           if (
             hasEndAnchor &&
-            input.length - remainingChars.length < input.length
+            inputString.length - remainingCharacters.length < inputString.length
           ) {
-            isValid = false;
+            isMatchValid = false;
           }
           break;
         }
       } else {
-        isValid = false;
+        matchStartIndex++;
+      }
+    } else {
+      const tokenParseResult = parsedTokens[0]?.(
+        currentCharacter,
+        remainingCharacters
+      );
+      if (tokenParseResult?.valid) {
+        parsedTokens.splice(0, 1);
+        if (tokenParseResult.returnCharacter) {
+          remainingCharacters.unshift(currentCharacter);
+        }
+        if (!parsedTokens.length) {
+          if (
+            hasEndAnchor &&
+            inputString.length - remainingCharacters.length < inputString.length
+          ) {
+            isMatchValid = false;
+          }
+          break;
+        }
+      } else {
+        remainingCharacters.unshift(currentCharacter);
+        isMatchValid = false;
         break;
       }
     }
   }
 
-  if (tokenParsers.length) {
+  if (parsedTokens.length) {
     return false;
   }
 
-  return isValid;
+  return {
+    result: isMatchValid,
+    matchedGroup: inputString.substring(
+      matchStartIndex,
+      inputString.length - remainingCharacters.length
+    ),
+  };
 }
 
 async function execute() {
-  if (args[2] !== "-E") {
+  if (commandLineArgs[2] !== "-E") {
     console.log("Expected first argument to be '-E'");
     process.exit(1);
   }
 
   const inputString = await new Promise((resolve) => {
+    const stdin = process.stdin;
+    stdin.setEncoding("utf8");
     let data = "";
-    process.stdin.on("data", (chunk) => (data += chunk));
-    process.stdin.on("end", () => resolve(data.trim()));
+    stdin.on("data", (chunk) => (data += chunk));
+    stdin.on("end", () => resolve(data.trim()));
   });
 
-  if (doesPatternMatch(inputString, regexPattern)) {
+  const result = matchRegexPattern(inputString, regexPattern);
+
+  if (typeof result === "boolean" ? result : result.result) {
     process.exit(0);
   } else {
     process.exit(1);
