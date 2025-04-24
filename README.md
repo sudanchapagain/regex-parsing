@@ -1,13 +1,14 @@
 regex parser.
 =============
 
-Small, incomplete, un-optimized, messy, and non-standard implementation of regex. **this is my second time trying and
-it's messed up. giving up on this.**
+```nu
+"Sudan Chapagain" | ./main "^S.+t$"
+```
 
-Resources
+resources
 ---------
 
-* Read the short regex paper by Brian Kernighan and Rob Pike (pdf in resource folder.)
+* short regex paper by Brian Kernighan and Rob Pike (pdf in resource folder.)
 * [Regular Expression Language - Quick Reference | Microsoft](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference)
 * [Let's Build a Regex Engine | Kean](https://kean.blog/post/lets-build-regex)
 * [How to build a regex engine from scratch](https://rhaeguard.github.io/posts/regex/)

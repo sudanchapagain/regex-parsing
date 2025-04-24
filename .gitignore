@@ -1,42 +1,44 @@
-.gradle
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+# Precompiled Headers
+*.gch
+*.pch
 
-### Kotlin ###
-.kotlin
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Fortran module files
+*.mod
+*.smod
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
 
-### VS Code ###
-.vscode/
+# Executables
+*.exe
+*.out
+*.app
+server
 
-### Mac OS ###
-.DS_Store
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
