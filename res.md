@@ -1,5 +1,0 @@
-- Read the short regex paper by Brian Kernighan and Rob Pike
-- [Regular Expression Language - Quick Reference | Microsoft](https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference)
-- [Let's Build a Regex Engine | Kean](https://kean.blog/post/lets-build-regex)
-- [Implementing a Regular Expression Engine | Denis](https://deniskyashif.com/2019/02/17/implementing-a-regular-expression-engine/)
-- [Regular Expression Matching Can Be Simple And Fast (but is slow in Java, Perl, PHP, Python, Ruby, ...) | swtch](https://swtch.com/~rsc/regexp/regexp1.html)

@@ -1,0 +1,6 @@
+apple banana apple-banana
+aaabbbccc
+aabb abac
+the quick brown fox jumps over the lazy dog
+1234567890
+aAaBbCc 123!@#
