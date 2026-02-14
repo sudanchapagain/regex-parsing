@@ -1,8 +1,10 @@
 regex parser.
 =============
 
-Small, incomplete, un-optimized, messy, and non-standard implementation of regex. **this is my second time trying and
-it's messed up. giving up on this.**
+a regex with recursive AST experiment.
+
+> [!NOTE]
+> rewrite in progress <https://github.com/sudanchapagain/regex-parsing/tree/c_rewrite>
 
 ```nu
 "Sudan Chapagain" | ./main "^S.+t$"
