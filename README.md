@@ -1,14 +1,4 @@
-regex parser.
-=============
-
-a regex with recursive AST experiment.
-
-> [!NOTE]
-> rewrite in progress <https://github.com/sudanchapagain/regex-parsing/tree/c_rewrite>
-
-```nu
-"Sudan Chapagain" | ./main "^S.+t$"
-```
+regex parser with recursive AST experiment.
 
 resources
 ---------
